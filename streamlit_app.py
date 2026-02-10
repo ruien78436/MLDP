@@ -406,7 +406,7 @@ if st.button("🏁 RUN STRATEGY SIMULATION", type="primary", use_container_width
             ## Confidence based on model accuracy
             confidence = min(95, 70 + abs(delta_val) * 5)
             st.metric("Prediction Confidence", f"{confidence:.0f}%", 
-                     help="Based on historical model accuracy (R²=0.74, MAE=2.1)")
+                     help="Based on historical model accuracy (R²=0.34, MAE=4.8)")
             
         with m4:
             if delta_val > 0.5:
@@ -576,7 +576,7 @@ st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
     <p><b>Apex Strategy AI</b> | Future Race Predictions for {season_year} Season</p>
-    <p>Model: Random Forest | Accuracy: R² = 0.74 | Average Error: ±2.1 positions</p>
+    <p>Model: Random Forest | Accuracy: R² = 0.34 | Average Error: ±4.8 positions</p>
     <p>Training Data: 74 years of F1 history (1950-2024) | 26,760 races analyzed</p>
     <p style='margin-top: 10px;'>⚠️ <i>Predictions are statistical estimates based on historical patterns. 
     Cannot account for crashes, mechanical failures, extreme weather, or regulation changes.</i></p>
