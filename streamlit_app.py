@@ -113,12 +113,17 @@ with col_header_1:
     st.title("🏎️ Apex Strategy AI")
     st.markdown(f"### Grand Prix Prediction: **{selected_circuit}**")
 with col_header_2:
-    ## VISUAL ELEMENT C: Track Map
+    ## Track Map
     image_path = f"tracks/{selected_circuit.lower()}.svg"
     if os.path.exists(image_path):
         st.image(image_path, caption="Track Layout")
     else:
         st.info("Track Map Loading...") 
+    st.write("Current working directory:", os.getcwd())
+    if os.path.exists("tracks"):
+        st.write("Files in tracks folder:", os.listdir("tracks"))
+    else:
+        st.error("The 'tracks' folder was not found on the server.")
 
 st.markdown("---")
 
