@@ -4,9 +4,6 @@ import joblib
 import numpy as np
 import os
 
-## ---------------------------------------------------------
-## 1. SETUP & CONFIGURATION
-## ---------------------------------------------------------
 st.set_page_config(
     page_title="Apex Strategy AI",
     page_icon="🏎️",
@@ -28,10 +25,6 @@ model, model_columns = load_artifacts()
 if model is None:
     st.error("⚠️ Model files not found. Please run your notebook to generate .pkl files.")
     st.stop()
-
-## ---------------------------------------------------------
-## 2. HELPER FUNCTIONS
-## ---------------------------------------------------------
 
 def predict_position_change(driver_data):
     """
@@ -99,9 +92,6 @@ def generate_virtual_grid(user_team, user_driver_pos):
     
     return full_grid
 
-## ---------------------------------------------------------
-## 3. SIDEBAR: RACE SETTINGS
-## ---------------------------------------------------------
 st.sidebar.header("RACE CONFIGURATION")
 st.sidebar.markdown("Configure the race conditions to simulate strategy.")
 
@@ -118,23 +108,17 @@ st.sidebar.markdown("**Track Conditions**")
 altitude = st.sidebar.slider("Altitude (m)", 0, 2000, 10)
 season_year = st.sidebar.selectbox("Season", [2024, 2025, 2026])
 
-## ---------------------------------------------------------
-## 4. MAIN DASHBOARD
-## ---------------------------------------------------------
-
 col_header_1, col_header_2 = st.columns([3, 1])
 with col_header_1:
     st.title("🏎️ Apex Strategy AI")
     st.markdown(f"### Grand Prix Prediction: **{selected_circuit}**")
 with col_header_2:
     ## VISUAL ELEMENT C: Track Map
-    ## Logic: Checks if image exists, otherwise shows text
     image_path = f"tracks/{selected_circuit.lower()}.svg"
     if os.path.exists(image_path):
         st.image(image_path, caption="Track Layout")
     else:
         st.info("Track Map Loading...") 
-        # (This is where your map would go if you download the images)
 
 st.markdown("---")
 
@@ -146,7 +130,6 @@ if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True
     ## 2. Simulate Race for EVERY Driver
     simulation_results = []
     
-    ## Create a progress bar for effect
     progress_bar = st.progress(0)
     
     for i, driver in enumerate(virtual_grid):
@@ -177,10 +160,9 @@ if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True
             "change": pred_change
         })
         
-        ## Update progress
         progress_bar.progress((i + 1) / 20)
         
-    progress_bar.empty() # Remove bar when done
+    progress_bar.empty()
     
     ## 3. Sort Results by Predicted Finish
     simulation_results = sorted(simulation_results, key=lambda x: x['finish'])
@@ -188,9 +170,6 @@ if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True
     ## Identify User's Result
     user_result = next(item for item in simulation_results if item["name"] == "USER (You)")
     
-    ## ---------------------------------------------------------
-    ## VISUAL ELEMENT A: MOVEMENT GAUGE
-    ## ---------------------------------------------------------
     st.subheader("🏁 Race Outcome Prediction")
     
     m1, m2, m3, m4 = st.columns(4)
@@ -199,13 +178,12 @@ if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True
         st.metric("Starting Position", f"P{user_result['start']}")
     
     with m2:
-        ## Dynamic Color Logic
         delta_val = user_result['change']
         st.metric(
             "Predicted Finish", 
             f"P{int(round(user_result['finish']))}", 
             f"{delta_val:+.1f} Positions",
-            delta_color="normal" # Green for positive (up), Red for negative (down)
+            delta_color="normal"
         )
         
     with m3:
@@ -215,46 +193,51 @@ if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True
         status = "Attack" if delta_val > 0.5 else "Defend" if delta_val < -0.5 else "Maintain"
         st.metric("Strategy Mode", status)
 
-    ## ---------------------------------------------------------
-    ## VISUAL ELEMENT B: VIRTUAL GRID VISUALIZER
-    ## ---------------------------------------------------------
     st.markdown("---")
     st.subheader("📊 Live Leaderboard Simulation")
     
-    ## Create two columns for the "Before vs After" look
     col_grid_start, col_arrow, col_grid_finish = st.columns([4, 1, 4])
     
     with col_grid_start:
         st.markdown("**STARTING GRID**")
         for driver in virtual_grid:
-            ## Highlight the user
-            bg_color = "#2e7bcf" if driver['name'] == "USER (You)" else "#262730"
+            
+            if driver['name'] == "USER (You)":
+                bg_style = "background-color: #2e7bcf; color: white;" # Blue card, white text
+                team_color = "#e0e0e0" # Light gray for team name inside blue card
+            else:
+                bg_style = "background-color: var(--secondary-background-color); color: var(--text-color);" # Adaptive card
+                team_color = "opacity: 0.7;" # Adaptive opacity for team name
+
             st.markdown(
-                f"""<div style='background-color: {bg_color}; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>
-                    <b>P{driver['start_pos']}</b> - {driver['name']} <span style='color: #aaa; font-size: 0.8em;'>({driver['team']})</span>
+                f"""<div style='{bg_style} padding: 10px; border-radius: 5px; margin-bottom: 5px; border: 1px solid rgba(128, 128, 128, 0.2);'>
+                    <b>P{driver['start_pos']}</b> - {driver['name']} 
+                    <span style='font-size: 0.8em; {team_color}'>({driver['team']})</span>
                 </div>""", 
                 unsafe_allow_html=True
             )
             
     with col_arrow:
-        st.markdown("<br>" * 5, unsafe_allow_html=True) # Spacer
+        st.markdown("<br>" * 5, unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center; color: gray;'>➔</h1>", unsafe_allow_html=True)
         
     with col_grid_finish:
         st.markdown("**PREDICTED FINISH**")
         for i, driver in enumerate(simulation_results):
             final_pos = i + 1
-            ## Calculate movement arrow
             pos_diff = driver['start'] - final_pos
-            if pos_diff > 0: arrow = "🟢 ▲" # Gained places
-            elif pos_diff < 0: arrow = "🔴 ▼" # Lost places
+            if pos_diff > 0: arrow = "🟢 ▲"
+            elif pos_diff < 0: arrow = "🔴 ▼"
             else: arrow = "⚪ -"
             
-            ## Highlight the user
-            bg_color = "#2e7bcf" if driver['name'] == "USER (You)" else "#262730"
+            ## Apply same adaptive logic
+            if driver['name'] == "USER (You)":
+                bg_style = "background-color: #2e7bcf; color: white;"
+            else:
+                bg_style = "background-color: var(--secondary-background-color); color: var(--text-color);"
             
             st.markdown(
-                f"""<div style='background-color: {bg_color}; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>
+                f"""<div style='{bg_style} padding: 10px; border-radius: 5px; margin-bottom: 5px; border: 1px solid rgba(128, 128, 128, 0.2);'>
                     <b>P{final_pos}</b> {arrow} {driver['name']}
                 </div>""", 
                 unsafe_allow_html=True
