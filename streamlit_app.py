@@ -194,7 +194,7 @@ race_laps = st.sidebar.number_input("Race Laps", min_value=10, max_value=100, va
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**🌍 Track Conditions**")
-round_number = st.sidebar.number_input("Round Number", min_value=1, max_value=24, value=1, helps="Which round of the season is this?")
+round_number = st.sidebar.number_input("Round Number", min_value=1, max_value=24, value=1, help="Which round of the season is this?")
 altitude = st.sidebar.slider("Altitude (m)", 0, 2000, 10,
                             help="Track elevation - affects engine performance")
 
