@@ -271,7 +271,7 @@ with col_header_1:
 
 with col_header_2:
     ## Model info badge
-    st.metric("Model Accuracy", "R² = 0.34", delta="±4.8 positions avg")
+    st.metric("Model Accuracy", "R² = 0.38", delta="±4.7 positions avg")
 
 
 st.markdown("---")
@@ -280,7 +280,7 @@ st.info(f"""
 🔮 **Future Race Prediction for {season_year}**
 
 This tool predicts race outcomes for **upcoming races** to help teams develop strategy.
-The model was trained on 74 years of F1 data (1950-2024) and achieves ±2.1 position accuracy.
+The model was trained on 74 years of F1 data (1950-2024) and achieves ±5.8 position accuracy.
 
 ⚠️ **Predictions are estimates** - Cannot account for crashes, mechanical failures, extreme weather, or regulation changes.
 """)
@@ -411,7 +411,7 @@ if st.button("🏁 RUN STRATEGY SIMULATION", type="primary", use_container_width
             ## Confidence based on model accuracy
             confidence = min(95, 70 + abs(delta_val) * 5)
             st.metric("Prediction Confidence", f"{confidence:.0f}%", 
-                     help="Based on historical model accuracy (R²=0.34, MAE=4.8)")
+                     help="Based on historical model accuracy (R²=0.38, MAE=4.7)")
             
         with m4:
             if delta_val > 0.5:
@@ -581,7 +581,7 @@ st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
     <p><b>Apex Strategy AI</b> | Future Race Predictions for {season_year} Season</p>
-    <p>Model: Random Forest | Accuracy: R² = 0.34 | Average Error: ±4.8 positions</p>
+    <p>Model: Gradient Boosting Trees | Accuracy: R² = 0.38 | Average Error: ±4.7 positions</p>
     <p>Training Data: 74 years of F1 history (1950-2024) | 26,760 races analyzed</p>
     <p style='margin-top: 10px;'>⚠️ <i>Predictions are statistical estimates based on historical patterns. 
     Cannot account for crashes, mechanical failures, extreme weather, or regulation changes.</i></p>
