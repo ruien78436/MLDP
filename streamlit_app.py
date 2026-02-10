@@ -129,7 +129,7 @@ with col_header_1:
 with col_header_2:
     ## VISUAL ELEMENT C: Track Map
     ## Logic: Checks if image exists, otherwise shows text
-    image_path = f"tracks/{selected_circuit.lower().replace(' ', '_')}.svg"
+    image_path = f"tracks/{selected_circuit.lower()}.svg"
     if os.path.exists(image_path):
         st.image(image_path, caption="Track Layout")
     else:
