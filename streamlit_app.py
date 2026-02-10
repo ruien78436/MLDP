@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
+import os
 
 ## ---------------------------------------------------------
 ## 1. SETUP & CONFIGURATION
@@ -25,202 +26,239 @@ def load_artifacts():
 model, model_columns = load_artifacts()
 
 if model is None:
-    st.error("⚠️ Model files not found. Please run your notebook first to generate .pkl files.")
+    st.error("⚠️ Model files not found. Please run your notebook to generate .pkl files.")
     st.stop()
 
 ## ---------------------------------------------------------
-## 2. HELPER DATA (To make the app look real)
+## 2. HELPER FUNCTIONS
 ## ---------------------------------------------------------
 
-## Real Drivers for 2025 (Approximation for the demo)
-TEAM_DRIVERS = {
-    'Red Bull': ['Max Verstappen', 'Sergio Perez'],
-    'Ferrari': ['Charles Leclerc', 'Lewis Hamilton'],
-    'Mercedes': ['George Russell', 'Andrea Kimi Antonelli'],
-    'McLaren': ['Lando Norris', 'Oscar Piastri'],
-    'Aston Martin': ['Fernando Alonso', 'Lance Stroll'],
-    'Alpine': ['Pierre Gasly', 'Jack Doohan'],
-    'Williams': ['Alex Albon', 'Carlos Sainz'],
-    'RB': ['Yuki Tsunoda', 'Liam Lawson'],
-    'Kick Sauber': ['Nico Hulkenberg', 'Gabriel Bortoleto'],
-    'Haas F1 Team': ['Esteban Ocon', 'Oliver Bearman']
-}
+def predict_position_change(driver_data):
+    """
+    Predicts the position change for a single row of driver data.
+    """
+    df_input = pd.DataFrame(driver_data)
+    df_input = pd.get_dummies(df_input)
+    df_input = df_input.reindex(columns=model_columns, fill_value=0)
+    prediction = model.predict(df_input)[0]
+    return prediction
 
-## Map URLs for Visual Element C
-TRACK_MAPS = {
-    'Circuit de Monaco': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Circuit_de_Monaco_2003-2014.png/800px-Circuit_de_Monaco_2003-2014.png',
-    'Silverstone Circuit': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Silverstone_Circuit_2020.png/800px-Silverstone_Circuit_2020.png',
-    'Monza': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Monza_track_map.svg/800px-Monza_track_map.svg.png',
-    'Spa-Francorchamps': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Spa-Francorchamps_of_Belgium.svg/800px-Spa-Francorchamps_of_Belgium.svg.png',
-    'Marina Bay Street Circuit': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Marina_Bay_Street_Circuit_2023.svg/800px-Marina_Bay_Street_Circuit_2023.svg.png',
-    'Suzuka Circuit': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Suzuka_circuit_map_2005.svg/800px-Suzuka_circuit_map_2005.svg.png'
-}
+def generate_virtual_grid(user_team, user_driver_pos):
+    """
+    Generates a full grid of 20 drivers.
+    The user's driver is placed at 'user_driver_pos'.
+    The rest are filled with 'AI Opponents' based on realistic 2024 team performance.
+    """
+    ## Realistic 2024 Grid Order (approximate strength)
+    grid_template = [
+        {"name": "Max Verstappen", "team": "Red Bull"},
+        {"name": "Sergio Perez", "team": "Red Bull"},
+        {"name": "Charles Leclerc", "team": "Ferrari"},
+        {"name": "Carlos Sainz", "team": "Ferrari"},
+        {"name": "Lando Norris", "team": "McLaren"},
+        {"name": "Oscar Piastri", "team": "McLaren"},
+        {"name": "Lewis Hamilton", "team": "Mercedes"},
+        {"name": "George Russell", "team": "Mercedes"},
+        {"name": "Fernando Alonso", "team": "Aston Martin"},
+        {"name": "Lance Stroll", "team": "Aston Martin"},
+        {"name": "Yuki Tsunoda", "team": "RB"},
+        {"name": "Daniel Ricciardo", "team": "RB"},
+        {"name": "Nico Hulkenberg", "team": "Haas F1 Team"},
+        {"name": "Kevin Magnussen", "team": "Haas F1 Team"},
+        {"name": "Alex Albon", "team": "Williams"},
+        {"name": "Logan Sargeant", "team": "Williams"},
+        {"name": "Esteban Ocon", "team": "Alpine"},
+        {"name": "Pierre Gasly", "team": "Alpine"},
+        {"name": "Valtteri Bottas", "team": "Kick Sauber"},
+        {"name": "Zhou Guanyu", "team": "Kick Sauber"}
+    ]
+    
+    ## 1. Create the Starting Grid List
+    full_grid = []
+    
+    ## Place User's Driver
+    user_driver = {"name": "USER (You)", "team": user_team, "start_pos": user_driver_pos}
+    full_grid.append(user_driver)
+    
+    ## Fill the other 19 spots
+    current_pos = 1
+    for driver in grid_template:
+        if len(full_grid) >= 20: break
+        
+        ## Skip the position taken by the user
+        if current_pos == user_driver_pos:
+            current_pos += 1
+            
+        ## Add opponent
+        driver["start_pos"] = current_pos
+        full_grid.append(driver)
+        current_pos += 1
+        
+    ## Sort by Starting Position
+    full_grid = sorted(full_grid, key=lambda x: x['start_pos'])
+    
+    return full_grid
 
 ## ---------------------------------------------------------
-## 3. SIDEBAR INPUTS
+## 3. SIDEBAR: RACE SETTINGS
 ## ---------------------------------------------------------
-st.sidebar.header("STRATEGY CONFIGURATION")
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/3/33/F1.svg", width=100)
+st.sidebar.header("RACE CONFIGURATION")
+st.sidebar.markdown("Configure the race conditions to simulate strategy.")
 
-selected_team = st.sidebar.selectbox("Your Team", list(TEAM_DRIVERS.keys()))
-selected_driver = st.sidebar.selectbox("Your Driver", TEAM_DRIVERS[selected_team])
-selected_circuit = st.sidebar.selectbox("Select Circuit", list(TRACK_MAPS.keys()))
+teams = ['Red Bull', 'Ferrari', 'Mercedes', 'McLaren', 'Aston Martin', 'Alpine', 'Williams', 'Haas F1 Team', 'Kick Sauber', 'RB']
+circuits = ['Circuit de Monaco', 'Silverstone Circuit', 'Monza', 'Spa-Francorchamps', 'Marina Bay Street Circuit', 'Suzuka Circuit']
 
-st.sidebar.subheader("Race Conditions")
+selected_team = st.sidebar.selectbox("Your Team", teams)
+selected_circuit = st.sidebar.selectbox("Circuit", circuits)
 grid_position = st.sidebar.slider("Starting Grid Position", 1, 20, 10)
-qualifying_pos = st.sidebar.slider("Qualifying Pace (P1-P20)", 1, 20, grid_position)
 race_laps = st.sidebar.number_input("Race Laps", value=50)
-altitude = st.sidebar.slider("Altitude (m)", 0, 2200, 10)
-season_year = st.sidebar.number_input("Season", value=2025)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Track Conditions**")
+altitude = st.sidebar.slider("Altitude (m)", 0, 2000, 10)
+season_year = st.sidebar.selectbox("Season", [2024, 2025, 2026])
 
 ## ---------------------------------------------------------
 ## 4. MAIN DASHBOARD
 ## ---------------------------------------------------------
 
-st.title("🏎️ Apex Strategy AI")
-st.caption("Real-time Strategic Performance Prediction Engine")
+col_header_1, col_header_2 = st.columns([3, 1])
+with col_header_1:
+    st.title("🏎️ Apex Strategy AI")
+    st.markdown(f"### Grand Prix Prediction: **{selected_circuit}**")
+with col_header_2:
+    ## VISUAL ELEMENT C: Track Map
+    ## Logic: Checks if image exists, otherwise shows text
+    image_path = f"tracks/{selected_circuit.lower().replace(' ', '_')}.png"
+    if os.path.exists(image_path):
+        st.image(image_path, caption="Track Layout")
+    else:
+        st.info("Track Map Loading...") 
+        # (This is where your map would go if you download the images)
 
-if st.button("RUN RACE SIMULATION", type="primary", use_container_width=True):
+st.markdown("---")
+
+if st.button("RUN STRATEGY SIMULATION", type="primary", use_container_width=True):
     
-    ## -----------------------------------------------------
-    ## STEP A: PREDICT USER RESULT
-    ## -----------------------------------------------------
+    ## 1. Generate the Virtual Grid (All 20 Drivers)
+    virtual_grid = generate_virtual_grid(selected_team, grid_position)
     
-    ## Prepare Input
-    input_df = pd.DataFrame({
-        'starting_position': [grid_position],
-        'qualifying_pos': [qualifying_pos],
-        'laps': [race_laps],
-        'year': [season_year],
-        'round': [1], 'alt': [altitude],
-        'constructor_name': [selected_team],
-        'circuit_name': [selected_circuit]
-    })
+    ## 2. Simulate Race for EVERY Driver
+    simulation_results = []
     
-    ## Encode
-    input_df = pd.get_dummies(input_df)
-    input_df = input_df.reindex(columns=model_columns, fill_value=0)
+    ## Create a progress bar for effect
+    progress_bar = st.progress(0)
     
-    ## Predict
-    user_pred_change = model.predict(input_df)[0]
-    user_finish = grid_position - user_pred_change
-    user_finish = max(1, min(20, user_finish)) ## Clamp between 1 and 20
+    for i, driver in enumerate(virtual_grid):
+        ## Prepare Input for Model
+        input_data = {
+            'starting_position': [driver['start_pos']],
+            'qualifying_pos': [driver['start_pos']], # Simplify for simulation
+            'laps': [race_laps],
+            'year': [season_year],
+            'round': [1],
+            'alt': [altitude],
+            'constructor_name': [driver['team']],
+            'circuit_name': [selected_circuit]
+        }
+        
+        ## Predict
+        pred_change = predict_position_change(input_data)
+        
+        ## Calculate Finish
+        pred_finish = driver['start_pos'] - pred_change
+        pred_finish = max(1.0, min(20.0, pred_finish)) # Clamp between 1 and 20
+        
+        simulation_results.append({
+            "name": driver['name'],
+            "team": driver['team'],
+            "start": driver['start_pos'],
+            "finish": pred_finish,
+            "change": pred_change
+        })
+        
+        ## Update progress
+        progress_bar.progress((i + 1) / 20)
+        
+    progress_bar.empty() # Remove bar when done
     
-    ## -----------------------------------------------------
-    ## STEP B: VISUAL ELEMENT A (MOVEMENT GAUGE)
-    ## -----------------------------------------------------
+    ## 3. Sort Results by Predicted Finish
+    simulation_results = sorted(simulation_results, key=lambda x: x['finish'])
     
-    st.markdown("### 📊 Strategy Forecast")
+    ## Identify User's Result
+    user_result = next(item for item in simulation_results if item["name"] == "USER (You)")
     
-    col1, col2, col3, col4 = st.columns(4)
+    ## ---------------------------------------------------------
+    ## VISUAL ELEMENT A: MOVEMENT GAUGE
+    ## ---------------------------------------------------------
+    st.subheader("🏁 Race Outcome Prediction")
     
-    with col1:
-        st.metric("Grid Start", f"P{grid_position}")
+    m1, m2, m3, m4 = st.columns(4)
     
-    with col2:
-        ## Color Logic for Element A
+    with m1:
+        st.metric("Starting Position", f"P{user_result['start']}")
+    
+    with m2:
+        ## Dynamic Color Logic
+        delta_val = user_result['change']
         st.metric(
             "Predicted Finish", 
-            f"P{user_finish:.0f}", 
-            f"{user_pred_change:+.1f} Places",
-            delta_color="normal" ## Green = Good (Positive number means gained places)
+            f"P{int(round(user_result['finish']))}", 
+            f"{delta_val:+.1f} Positions",
+            delta_color="normal" # Green for positive (up), Red for negative (down)
         )
         
-    with col3:
-        st.metric("Track Temp", "28°C", "Dry") ## Static context
+    with m3:
+        st.metric("Overtake Probability", f"{abs(delta_val)*10:.1f}%", help="Estimated confidence")
         
-    with col4:
-        risk_level = "HIGH" if user_pred_change < -2 else "LOW"
-        st.metric("Risk Level", risk_level, "AI Assessment", delta_color="off")
+    with m4:
+        status = "Attack" if delta_val > 0.5 else "Defend" if delta_val < -0.5 else "Maintain"
+        st.metric("Strategy Mode", status)
 
+    ## ---------------------------------------------------------
+    ## VISUAL ELEMENT B: VIRTUAL GRID VISUALIZER
+    ## ---------------------------------------------------------
     st.markdown("---")
-
-    ## -----------------------------------------------------
-    ## STEP C: VISUAL ELEMENT B (VIRTUAL GRID VISUALIZER)
-    ## -----------------------------------------------------
+    st.subheader("📊 Live Leaderboard Simulation")
     
-    col_left, col_right = st.columns([1, 1])
+    ## Create two columns for the "Before vs After" look
+    col_grid_start, col_arrow, col_grid_finish = st.columns([4, 1, 4])
     
-    with col_left:
-        st.subheader(f"📍 Track Context: {selected_circuit}")
-        ## Visual Element C: Map
-        if selected_circuit in TRACK_MAPS:
-            st.image(TRACK_MAPS[selected_circuit], caption="Circuit Layout", use_container_width=True)
-        else:
-            st.info("Map unavailable for this track.")
+    with col_grid_start:
+        st.markdown("**STARTING GRID**")
+        for driver in virtual_grid:
+            ## Highlight the user
+            bg_color = "#2e7bcf" if driver['name'] == "USER (You)" else "#262730"
+            st.markdown(
+                f"""<div style='background-color: {bg_color}; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>
+                    <b>P{driver['start_pos']}</b> - {driver['name']} <span style='color: #aaa; font-size: 0.8em;'>({driver['team']})</span>
+                </div>""", 
+                unsafe_allow_html=True
+            )
             
-    with col_right:
-        st.subheader("🏁 Predicted Leaderboard")
+    with col_arrow:
+        st.markdown("<br>" * 5, unsafe_allow_html=True) # Spacer
+        st.markdown("<h1 style='text-align: center; color: gray;'>➔</h1>", unsafe_allow_html=True)
         
-        ## 1. GENERATE A FULL GRID (SIMULATION)
-        ## We create a fake grid of 20 drivers to make the app look "Live"
-        grid_data = []
-        
-        ## We just assign random grid slots to other drivers for the demo
-        ## In a real app, you'd let the user configure the whole grid
-        current_grid = 1
-        
-        for team, drivers in TEAM_DRIVERS.items():
-            for driver in drivers:
-                ## If this is the USER's driver, use their inputs
-                if driver == selected_driver:
-                    row = {
-                        'Driver': driver, 'Team': team, 'Start': grid_position,
-                        'Pred_Change': user_pred_change, 'Finish': user_finish
-                    }
-                else:
-                    ## For AI drivers, we assign a grid slot and run a quick prediction
-                    ## Skip the user's grid slot
-                    if current_grid == grid_position: current_grid += 1
-                    
-                    ai_start = current_grid
-                    ## Mock AI Prediction (We use the model!)
-                    ai_input = input_df.copy()
-                    ai_input['starting_position'] = ai_start
-                    ## We assume opponents qualify where they start
-                    ai_input['qualifying_pos'] = ai_start 
-                    
-                    ## Handle Team Name OHE for AI
-                    ai_input = ai_input.reindex(columns=model_columns, fill_value=0)
-                    if f'constructor_name_{team}' in model_columns:
-                        ai_input[f'constructor_name_{team}'] = 1
-                    
-                    ai_pred_change = model.predict(ai_input)[0]
-                    ai_finish = max(1, min(20, ai_start - ai_pred_change))
-                    
-                    row = {
-                        'Driver': driver, 'Team': team, 'Start': ai_start,
-                        'Pred_Change': ai_pred_change, 'Finish': ai_finish
-                    }
-                    current_grid += 1
-                
-                grid_data.append(row)
-        
-        ## 2. SORT BY PREDICTED FINISH
-        results_df = pd.DataFrame(grid_data)
-        results_df = results_df.sort_values(by='Finish', ascending=True)
-        results_df = results_df.reset_index(drop=True)
-        
-        ## 3. DISPLAY AS A TABLE WITH ARROWS
-        ## We iterate through the top 10 to display nicely
-        st.write("Top 10 Predicted Finishers")
-        
-        for i, row in results_df.head(10).iterrows():
-            pos = i + 1
-            driver = row['Driver']
-            team = row['Team']
-            change = row['Pred_Change']
+    with col_grid_finish:
+        st.markdown("**PREDICTED FINISH**")
+        for i, driver in enumerate(simulation_results):
+            final_pos = i + 1
+            ## Calculate movement arrow
+            pos_diff = driver['start'] - final_pos
+            if pos_diff > 0: arrow = "🟢 ▲" # Gained places
+            elif pos_diff < 0: arrow = "🔴 ▼" # Lost places
+            else: arrow = "⚪ -"
             
-            ## Arrow Logic
-            if change > 0.5: icon = "🟢 ▲"  # Gained
-            elif change < -0.5: icon = "🔴 ▼" # Lost
-            else: icon = "⚪ -" # Stable
+            ## Highlight the user
+            bg_color = "#2e7bcf" if driver['name'] == "USER (You)" else "#262730"
             
-            ## Highlight the User
-            if driver == selected_driver:
-                st.markdown(f"**{pos}. {driver} ({team})** {icon} {abs(change):.1f}")
-            else:
-                st.markdown(f"{pos}. {driver} ({team}) {icon} {abs(change):.1f}")
+            st.markdown(
+                f"""<div style='background-color: {bg_color}; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>
+                    <b>P{final_pos}</b> {arrow} {driver['name']}
+                </div>""", 
+                unsafe_allow_html=True
+            )
 
 else:
-    st.info("👈 Configure race parameters in the sidebar and click RUN to initialize strategy engine.")
+    st.info("👈 Configure your race strategy in the sidebar to begin.")
