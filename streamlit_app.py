@@ -257,17 +257,18 @@ with col_header_1:
     st.title("🏎️ Apex Strategy AI")
     st.markdown(f"### {season_year} Season Prediction: **{selected_circuit}**")
     st.markdown(f"*Future Race Strategy Powered by Machine Learning*")
-    ## Track Map
-    image_path = f"circuits/{selected_circuit.lower()}.svg"
-    if os.path.exists(image_path):
-        st.image(image_path, caption="Track Layout")
-    else:
-        st.info("Track Map Loading...")
 
 with col_header_2:
     ## Model info badge
     st.metric("Model Accuracy", "R² = 0.34", delta="±4.8 positions avg")
 
+## Track Map
+    image_path = f"circuits/{selected_circuit.lower()}.svg"
+    if os.path.exists(image_path):
+        st.image(image_path, caption="Track Layout")
+    else:
+        st.info("Track Map Loading...")
+        
 st.markdown("---")
 
 st.info(f"""
