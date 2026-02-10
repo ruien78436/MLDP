@@ -20,15 +20,16 @@ def load_artifacts():
     try:
         model = joblib.load('f1_position_model.pkl')
         model_columns = joblib.load('f1_model_columns.pkl')
-        return model, model_columns
+        kmeans = joblib.load('f1_kmeans_model.pkl') ## Load K-Means
+        return model, model_columns, kmeans
     except FileNotFoundError as e:
-        return None, None
+        return None, None, None
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
-        return None, None
+        return None, None, None
 
 ## Load model
-model, model_columns = load_artifacts()
+model, model_columns, kmeans = load_artifacts()
 
 ## Check if model loaded successfully
 if model is None:
@@ -55,6 +56,10 @@ def predict_position_change(driver_data):
     try:
         ## Convert to DataFrame
         df_input = pd.DataFrame(driver_data)
+
+        ## Calculate Grid Tier
+        # Use loaded K-Means model to predict the tier for the input grid pos
+        df_input['grid_tier'] = kmeans.predict(df_input[['starting_position']])
         
         ## One-hot encode categorical variables
         df_input = pd.get_dummies(df_input)
